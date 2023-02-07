@@ -1,0 +1,128 @@
+---
+title: "Sok-1005 Assignment 1"
+author: "14"
+format: pdf
+editor: visual
+---
+
+## Assignment text. 
+
+Download the four data series, i.e., temperature measurements at the four different locations in the atmosphere; the Lower-Troposphere, Mid-Troposphere, Tropopause, and Lower-Stratosphere. Each dataset is found using its unique URL. 
+
+Use only the Global temperature from each dataset (i.e., the third data column). 
+
+For each of the four locations in the atmosphere, calculate the **12-month(right-aligned) moving average** (or mean) (you can run **?zoo::rollmean** in the R console to understand what the **right-aligned average** means**)** using all the available data points. Also, calculate a new variable called **Average**, which is the average of the four 12-month moving averages. Make a plot of the four-atmosphere locations and their **Average** in the same plot. Note, the original data points are not to be used in the plot. Include labels identifying the location of the temperature measurements, and the **Average**. In the plot, you should only use data from January 1980 and onwards. 
+
+```{r}
+#| echo: false
+rm(list=ls())
+library(tidyverse)
+library(zoo)
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| output: false
+# making df from the url.  
+df_ltrop <- read_table2("https://www.nsstc.uah.edu/data/msu/v6.0/tlt/uahncdc_lt_6.0.txt")
+
+df_midtrop <- read_table2("https://www.nsstc.uah.edu/data/msu/v6.0/tmt/uahncdc_mt_6.0.txt")
+
+df_trop <- read_table2("https://www.nsstc.uah.edu/data/msu/v6.0/ttp/uahncdc_tp_6.0.txt")
+
+df_lstrat <- read_table2("https://www.nsstc.uah.edu/data/msu/v6.0/tls/uahncdc_ls_6.0.txt")
+
+```
+
+```{r}
+# Removing the values that i dont need. 
+df_ltrop <- df_ltrop[1:which(df_ltrop$Year %in% "Year")-1, ]
+df_midtrop <- df_midtrop[1:which(df_midtrop$Year %in% "Year")-1, ]
+df_trop <- df_trop[1:which(df_trop$Year %in% "Year")-1, ]
+df_lstrat <- df_lstrat[1:which(df_lstrat$Year %in% "Year")-1, ]
+
+# Selecting the coloumns im gonna keep. 
+df_ltrop <- df_ltrop[c(1,2,3)] 
+df_midtrop <- df_midtrop[c(1,2,3)]
+df_trop <- df_trop[c(1,2,3)]
+df_lstrat <- df_lstrat[c(1,2,3)]
+
+# Changing the names, easier when i cbind the df´s. 
+df_ltrop <- df_ltrop %>% 
+  rename(lowtrop = Globe, year = Year, mo = Mo)
+df_midtrop <- df_midtrop %>%
+  rename(midtrop = Globe, year = Year, mo = Mo)
+df_trop <- df_trop %>%
+  rename(trop = Globe, year = Year, mo = Mo)
+df_lstrat <- df_lstrat%>%
+  rename(lowstrat = Globe, year = Year, mo = Mo)
+
+# Making a date coloumn. 
+df_ltrop <- df_ltrop %>%
+  mutate(Date = ymd(paste(df_ltrop$year, df_ltrop$mo, 1, sep="-")))
+df_midtrop <- df_midtrop %>%
+  mutate(Date = ymd(paste(df_midtrop$year, df_midtrop$mo, 1, sep="-")))
+df_trop <- df_trop %>%
+  mutate(Date = ymd(paste(df_trop$year, df_trop$mo, 1, sep="-")))
+df_lstrat <- df_lstrat %>%
+  mutate(Date = ymd(paste(df_lstrat$year, df_lstrat$mo, 1, sep="-"))) 
+
+# Selecting the coloumns im gonna keep. 
+df_ltrop <- df_ltrop[c(3,4)] 
+df_midtrop <- df_midtrop[c(3,4)]
+df_trop <- df_trop[c(3,4)]
+df_lstrat <- df_lstrat[c(3,4)]
+
+# Changing from chr to numeric. 
+df_ltrop$lowtrop <- as.numeric(df_ltrop$lowtrop)
+df_midtrop$midtrop <- as.numeric(df_midtrop$midtrop)
+df_trop$trop <- as.numeric(df_trop$trop)
+df_lstrat$lowstrat <- as.numeric(df_lstrat$lowstrat)
+```
+
+```{r}
+# Creating rollmean for the df´s. 
+df_ltrop <- df_ltrop %>%
+  mutate(avg_lowtrop = rollmean(lowtrop, k = 12, fill = NA, align = 'right'))
+df_midtrop <- df_midtrop %>%
+  mutate(avg_midtrop = rollmean(midtrop, k = 12, fill = NA, align = 'right'))
+df_trop <- df_trop %>%
+  mutate(avg_trop = rollmean(trop, k = 12, fill = NA, align = 'right'))
+df_lstrat <- df_lstrat %>%
+  mutate(avg_lowstrat = rollmean(lowstrat, k = 12, fill = NA, align = 'right'))
+```
+
+```{r}
+# cbind the df´s.
+df <- cbind(df_ltrop, df_midtrop, df_trop, df_lstrat)
+
+# Selecting coloumns to keep. 
+df <- df[c(1,2,3,4,6,7,9,10,12)]
+
+# Filter Date from 1980. 
+df <- df %>%
+  filter(Date >= '1980-01-01') 
+
+# Creating Average coloumn.
+df <- df %>% 
+  mutate(df, Average = rowMeans(select(df, c(avg_lowtrop, avg_midtrop, avg_trop, avg_lowstrat)), na.rm = TRUE))
+
+```
+
+```{r}
+# Making a figure with average. 
+df %>% 
+  ggplot() +
+  geom_line(aes(x = Date, y = avg_lowtrop, col = "Lower-Troposphere")) +
+  geom_line(aes(x = Date, y = avg_midtrop, col = "Mid-Troposphere")) +
+  geom_line(aes(x = Date, y = avg_trop, col = "Tropopause")) +
+  geom_line(aes(x = Date, y = avg_lowstrat, col = "Lower-Stratosphere")) +
+  geom_line(aes(x = Date, y = Average, col = "Average"), size = 1) +
+  labs(x = "Year",
+       y = "Temperature in celsius",
+       title = "Plot of temperature over time") +
+    theme_minimal()
+```
+
+\
