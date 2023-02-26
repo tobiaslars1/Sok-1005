@@ -1,0 +1,101 @@
+# Assignment - 2
+
+### Scraping an html table from a web page (Compulsory Assignment).
+
+```{r}
+rm(list = ls())
+
+library("rvest")
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(stringr)
+```
+
+## Task 1.
+
+Once the web page is loaded in a browser, you can look at the html code by right-clicking on the mouse. Select View Page Source.
+
+Find the gtml "tag" of the table, and attach a package in R that reads html, e.g. **rvest,** Scrape the table from the website.
+
+Note that in this table there is a lot of unnecessary "clutter" that needs to be cleaned up before one is left with the range figures.
+
+Crate a ggplot, where "stop" is on the y-axis, and "wltp" is on the x-axis. Add a 45-degree line showing how far the cars "really" should have driven (red line in my fig below).
+
+Create an appropriate title and accompanying Character text that explains what is "happening" in the figure.
+
+```{r}
+url <- "https://www.motor.no/aktuelt/motors-store-vintertest-av-rekkevidde-pa-elbiler/217132"
+
+html <- read_html(url)
+
+df_car <- html_table(html)[[1]]
+```
+
+```{r}
+df_car <- df_car[-1,]
+df_car <- df_car %>%
+  rename(model = X1) %>%
+  rename(WLTP = X2) %>%
+  rename(STOP = X3) %>%
+  rename(deviation = X4)
+
+df_car <- separate(df_car, col = WLTP, into = c("km", "kWh"), sep = "/")
+
+df_car <- separate(df_car, col = km, into = c("num", "text"), sep = " ")
+
+df_car <- df_car %>%
+  rename(WLTP = num)
+
+df_car <- separate(df_car, col = STOP, into = c("num", "text"), sep = " ")
+
+df_car <- df_car %>%
+  rename(STOP = num)
+
+df_car <- df_car %>%
+  select(-c(3,6))
+
+df_car$STOP <- as.numeric(df_car$STOP)
+df_car$WLTP <- as.numeric(df_car$WLTP)
+
+df_car
+```
+
+```{r, warning=FALSE}
+fig1 <- ggplot(df_car, aes(x = WLTP, y = STOP)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = "red") +
+  labs(title = "Expected mileage of electric cars",
+       subtitle = "Dots is actual mileage, and the red line is expected") +
+  xlim(200, 600) +
+  ylim(200, 600) +
+  theme_minimal()
+
+fig1
+```
+
+## Task 2
+
+None of the car brands reach the red line (expected mileage). But there is a clear positive correlation between what is promised and actual mileage. 
+
+Use R\'s [lm()function](https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/lm). Use \"stop\" as y variable and \"wltp\" as an x-variable, and specify the name of your data set. 
+
+*lm(\< Y variable name \> \~ \<X variable \>, data = \<dataset name\>)* \
+
+After \"running\" the code, how do you interpret the two values on the customized line?
+
+Add the custom line to ggplot using +
+
+*geom_smooth(method = lm)*. 
+
+```{r}
+lm(STOP ~ WLTP, data = df_car)
+```
+
+```{r, warning=FALSE}
+fig1 + geom_smooth(method = lm) +
+  labs(title = "Expected mileage of electric cars, with lm", subtitle = "Blue line is lm() of STOP and WLTP")
+```
+
+\
+\
