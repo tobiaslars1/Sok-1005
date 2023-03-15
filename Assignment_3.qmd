@@ -1,0 +1,99 @@
+---
+title: "Assignment_3"
+format: html
+editor: visual
+---
+
+## Assignment 3: Reading json data from a web page.
+
+```{r, echo=FALSE}
+rm(list = ls())
+
+library(rvest)
+library(tidyverse)
+library(jsonlite)
+library(tidyr)
+library(ggrepel)
+library(scales)
+```
+
+## Task 1
+
+To access the website you need to register with the NYT, this is free.
+
+Once the web page is loaded in a browser, you can look at the html code by right-clicking ont the mouse. Select View Page Source.
+
+Find the JSON link with the JSON data from which the figure reads the data.
+
+Use a package in R that reads JSON ( for instance, jsonlite or rjstat), and download the data from the link.
+
+Create a ggplot that replicates the figure above.
+
+```{r}
+url <- "https://static01.nyt.com/newsgraphics/2021/12/20/us-coronavirus-deaths-2021/ff0adde21623e111d8ce103fedecf7ffc7906264/scatter.json"
+
+df <- fromJSON(url)
+
+df <- as.tibble(df)
+
+df <- df %>%
+  rename(vac = fully_vaccinated_pct_of_pop) %>%
+  rename(dead_100k = deaths_per_100k)
+
+df$state <- state.abb[match(df$name,state.name)]
+
+df$state <- df$state %>%
+  replace_na('DC')
+```
+
+```{r}
+fig1 <- ggplot(df, aes(x = vac, y = dead_100k)) +
+  geom_point(size = 2, color = "lightgreen") +
+  geom_text_repel(aes(label = state), size = 2.5) +
+  
+  
+  scale_x_continuous(breaks = seq(0.40, 0.85, 0.05), labels = percent) +
+  labs(x = "Share of total population fully vaccinated", 
+       y= "20 avg. monthly deaths per 100 000",
+       title = "Covid-19 deaths since universal adult vaccine eligibility compared with vaccination rates") +
+  
+  annotate("segment", x = 0.76, xend = 0.77, y = 9, yend = 8,
+           arrow = arrow(angle = 45, length = unit(.2,"cm"))) +
+  annotate("text", x = 0.76, y = 10, label = "Higher vaccination rate", size = 2) +
+  annotate("text", x = 0.76, y = 9.5, label = "lower death rate", size = 2) +
+  
+  annotate("segment", x = 0.56, xend = 0.55, y = 17, yend = 18,
+           arrow = arrow(angle = 45, length = unit(.2,"cm"))) +
+  annotate("text", x = 0.56, y = 16.5, label = "Lower vaccination rate", size = 2) +
+  annotate("text", x = 0.56, y = 16, label = "higher death rate", size = 2) +
+  
+  theme_minimal()
+
+fig1
+```
+
+## Task 2
+
+There is a clear negative correlation between the number of deaths per 100 000 (y-axis) and the proportion of the population vaccinated (x-axis).
+
+Use R´s lm() function. Set the variable on the y-axis and x-axis, and specify the data set.
+
+*LM(\<Y variable name\> \~ \<X variable\>, data=\<dataset name\>)*
+
+After "running" the code, how do you interpret the two values on the customized line?
+
+Add the cosum line to ggplot using + *Geom_smooth(method = lm).*
+
+```{r}
+lm(dead_100k ~ vac, data = df)
+```
+
+```{r}
+fig2 <- fig1 + 
+  geom_smooth(method = lm)
+
+fig2
+```
+
+The way i see it, there is a positive effect on the vaccine. The state that stands out is Florida, where about 60% is fully vaccinated but there are high death rate. \
+\
