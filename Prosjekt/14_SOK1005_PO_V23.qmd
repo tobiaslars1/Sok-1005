@@ -1,0 +1,286 @@
+---
+title: "14_SOK1005_PO_V23"
+author: "14"
+format: pdf
+echo: FALSE
+---
+
+## Oppgave 1
+
+**Den første oppgaven er å skrive R/Python kode som slår sammen de 4 datasettene til et stort datasett. Du må benytte de variablene som de ulike datasettene har til felles for å gjøre dette. Prosessen skal dokumenteres og kommenteres. Dataene er beskrevet i et eget dokument, "Data til Prosjektoppgave Vår 2023".**
+
+```{r}
+rm(list = ls())
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(readr))
+suppressPackageStartupMessages(library(lubridate))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(zoo))
+suppressPackageStartupMessages(library(stringr))
+```
+
+```{r}
+# Henter ferdig df fra github. 
+url <- "https://raw.githubusercontent.com/tobiaslars1/Sok-1005/main/Prosjekt/df-kopi.csv"
+
+df <- read.csv(url(url))
+
+# Fjerner rader jeg ikke trenger. 
+df <- df %>%
+  select(-c('date', 'grocery', 'groccoup'))
+```
+
+## Oppgave 2
+
+**Dataene skal benyttes til en ukentlig salgsrapport til et enkelt utsalg. Gi noen eksempler på hva innholdet i en slik kortsiktig individuell rapport bør inneholde. Begrunn dine valg og tankegangen bak figurer og eventuelle tabeller.**
+
+Ukentlig salgsrapport bør inneholde nøkkelinformasjon over salgs-aktivitet, fortjeneste og eventuelle sammenhenger mellom kunder og den relevante varen. Den ukentlige rapporten min skal inneholde:
+
+1.  Salgstall: Dette gir et innblikk på hvilke typer som selger best.
+
+    -   På dette skal jeg lage en area graph, denne gir det beste inntrykket på hvordan salgene, samt fordelingen på merkene er.
+
+2.  Fortjeneste: Forteller hvilke varer som gir mest tilbake til butikken.
+
+    -   Stacked bar-graph skal visualisere denne fordelingen, bar-graph viser fortjenesten på en mer oversiktlig måte enn feks en area-graph.
+
+3.  Kundetall: Forteller hvor mange kunder som er innom butikken iløpet av året.
+
+    -   Kundetallene vises på samme måte som fortjeneste.
+
+Butikken jeg skal ta er "STORE 100", denne ligger CHICAGO.
+
+```{r}
+# Lager ny df slik at jeg kan manipulere den. 
+df_week <- df
+
+# Filter for den aktuelle STORE. 
+df_week <- df %>%
+  filter(STORE == 100)
+
+# Endrer slik at week starter på 1. 
+df_week <- df_week %>%
+  mutate(week = WEEK - min(WEEK)+1)
+
+# Fjerner eventuelle dupc. 
+df_week <- distinct(df_week)
+
+
+# area graf. 
+fig2.1 <- ggplot(data = df_week, aes(x = week, y = sales, fill = brand)) +
+  geom_area() +
+  labs(x = "Week",
+       y = "Sales in Dollar",
+       title = "Fig 2.1: Total sales in Chicago (Store 100)",
+       subtitle = "Based on brands",
+       caption = "Credit: Chicago Booth - Dominick`s Dataset") +
+  theme_bw()
+
+fig2.1
+```
+
+Figur 2.1 viser totale salg gjennom året for de forskjellige merkene med "Bathroom Tissues". Figuren viser at de to største merkene er Angel og Charmin, samt at det merke som selges minst av er av typen White. Bruken av en slik graf gir et godt innblikk i utviklingen av året og varen, den viser også "spikes" i markedet, der salgstallene går verdig kraftig opp (dette markant i uke 2 og 36). Den beste uken for butikken i Chicago er uke 36 der salget av Charmin var på hele 6864.66 Dollar.
+
+```{r}
+# Lager geom_col(). 
+fig2.2 <- ggplot(data = df_week, aes(x = week, y = PROFIT, fill = brand)) +
+  geom_col() +
+  labs(x = "Week",
+       y = "Profit in Dollar",
+       title = "Fig 2.2: Profit in Chicago (Store 100)",
+       subtitle = "Based on brands",
+       caption = "Credit: Chicago Booth - Dominick`s Dataset") +
+  theme_bw()
+
+fig2.2
+```
+
+Figur 2.2 viser hvordan profit er fordelt på ukene, samt mellom varene. Profit grafen gir egentlig samme innblikk som grafen ovenfor, den viser at de samme merkene som tidligere også har høyest fortjeneste. Det er Charmin som gir butikken mest fortjeneste, med Angel som trumfer noen uker. Den varen som gir butikken desidert minst fortjeneste er White, som er nederst på alle ukene utenom den ene uken da Dom er lavere. "Grafen har ikke data på ukene som står tomme på grafen".
+
+```{r}
+# Lagar barplot(). 
+fig2.3 <- ggplot(data = df_week, aes(x = week, y = custcoun)) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = "Week",
+       y = "Costumer value",
+       title = "Fig 2.3: Costumer count in Chicago (Store 100)",
+       caption = "Credit: Chicago Booth - Dominick`s Dataset") +
+  theme_bw()
+
+fig2.3
+```
+
+Figur 2.3 viser kundeflyten på butikken i Chicago, man ser denne butikken har god flyt. Tallene viser at den laveste uken mtp kunder var uke 2, med tall på ca 90 000 noe som er meget bra til å være den dårligste uken. Figuren viser også at flyten blant kunder er høy i første uke, deretter synker den og øker sakte men sikkert.
+
+## Oppgave 3
+
+**Dataene skal benyttes til en månedlig salgsrapport på aggregert nivå til konsernledelsen. Gi noen eksempler på hva innholdet i en slik langsiktig konsernrapport bør inneholde. Begrunn dine valg og tankegangen bak figurer og eventuelle tabeller.**
+
+Månedlig salgsrapport bør inneholde nøkkelinformasjon over salgs-aktivitet, fortjeneste og eventuelle sammenhenger mellom kunder og den relevante varen. Den månedlige rapporten min skal inneholde:
+
+1.  Salgstall:
+
+    -   Dette kan vise hvilke måneder som har mye og lite salg, dette gjør at konsernledelsen kan utvikle planer om eventuelle aktiviteter som kan innføres.
+
+2.  Fortjeneste:
+
+    -   Viser ledelsen hvilke varer de før satse mer på, samt kanskje hva de bør satse mindre på.
+
+3.  Kundetall:
+
+    -   Oversikt over hvilken butikk/butikker som har høy trafikk/dårlig trafikk.
+
+I den månedlige salgsrapporten skal jeg se på to nye butikker STORE 50 & 51.
+
+(HICKORY HILLS, PALOS HEIGHTS)
+
+```{r, warning=FALSE}
+# Lager ny df slik at jeg kan manipulere den. 
+df_month <- df[df$STORE == 50 | df$STORE == 51, ]
+
+df_month <- df_month %>%
+  mutate(week = WEEK - min(WEEK)+1)
+
+# Fjerner eventuelle dupc. 
+df_month <- distinct(df_month)
+
+# Endrer slik at det blir en month row. 
+df_month$month <- as.yearmon(df_month$week)
+
+# Regner salg based month og brand. 
+df_month_sales <- aggregate(sales ~ month + brand + STORE, data = df_month, FUN = sum)
+
+# Skiller år og mnd. 
+df_month_sales <- df_month_sales %>%
+  separate(month, into = c("old", "week", sep = " "))
+
+# Fjerner rows jeg ikke trenger. 
+df_month_sales <- df_month_sales %>%
+  select(-c(1, 3))
+
+# Endrer month fra chr til num. 
+df_month_sales$week <- as.numeric(df_month_sales$week) 
+
+# Endrer til månedtlige tall. 
+df_month_sales <- df_month_sales %>%
+  mutate(month = ceiling(week / 4)) 
+```
+
+```{r}
+# Lager geom_col(). 
+fig3.1 <- ggplot(data = df_month_sales, aes(x = month, y = sales, fill = brand)) +
+  geom_col() +
+  labs(x = "Month",
+       y = "Sales in Dollar",
+       title = "Fig 3.1: Total monthly sales in Chicago (Store 50 & 51)",
+       subtitle = "Based on brands",
+       caption = "Credit: Chicago Booth - Dominick`s Dataset") +
+  theme_bw()
+
+fig3.1
+```
+
+Figur 3.1 viser de totale månedlige salgstallene for butikk 50 & 51. Denne viser mye av det samme som i den ukentlige grafen ovenfor (STORE 100), det er samme trender på disse butikkene som den andre. Angel og Charmin er bestselgere, mens White er den som selges minst av. Butikkene viser gode salgstall, med unntak av uke 5 og 14. Den største forskjellen på månedlig og ukentlig salgsrapport er at på månedlig mangler data på merket Coronet.
+
+```{r, warning=FALSE}
+# Regner profit based month og brand. 
+df_month_profit <- aggregate(PROFIT ~ month + brand, data = df_month, FUN = sum)
+
+# Skiller mnd og week. 
+df_month_profit <- df_month_profit %>%
+  separate(month, into = c("old", "week", sep = " "))
+
+# Fjerner rows jeg ikke trenger. 
+df_month_profit <- df_month_profit %>%
+  select(-c(1, 3))
+
+# Endrer month fra chr til num. 
+df_month_profit$week <- as.numeric(df_month_profit$week) 
+
+# Endrer til månedtlige tall. 
+df_month_profit <- df_month_profit %>%
+  mutate(month = ceiling(week / 4)) 
+```
+
+```{r}
+# Lager geom_col(). 
+fig3.2 <- ggplot(data = df_month_profit, aes(x = month, y = PROFIT, fill = brand)) +
+  geom_col() +
+  labs(x = "Month",
+       y = "Profit in Dollar",
+       title = "Fig 3.2: Monthly Profit in Chicago (Store 50 & 51)",
+       subtitle = "Based on brands",
+       caption = "Credit: Chicago Booth - Dominick`s Dataset") +
+  theme_bw()
+
+fig3.2
+```
+
+Figur 3.2 viser utviklingen på profit på månedsbasis, og igjen så viser denne samme trender som i STORE 100.
+
+```{r, warning=FALSE}
+# Regner costcount based month og brand. 
+df_month_cc <- aggregate(custcoun ~ month + STORE, data = df_month, FUN = sum)
+
+# Skiller år og mnd. 
+df_month_cc <- df_month_cc %>%
+  separate(month, into = c("old", "week", sep = " "))
+
+# Fjerner rows jeg ikke trenger. 
+df_month_cc <- df_month_cc %>%
+  select(-c(1, 3))
+
+# Endrer month fra chr til num. 
+df_month_cc$week <- as.numeric(df_month_cc$week) 
+
+# Endrer til månedtlige tall. 
+df_month_cc <- df_month_cc %>%
+  mutate(month = ceiling(week / 4)) 
+```
+
+```{r}
+# Geom_col(). 
+fig3.3 <- ggplot(data = df_month_cc, aes(x = month, y = custcoun, fill = STORE)) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = "Month",
+       y = "Costumer value",
+       title = "Fig 3.3: Costumer count in Chicago (Store 50 & 51)",
+       caption = "Credit: Chicago Booth - Dominick`s Dataset") +
+  theme_bw()
+
+fig3.3
+```
+
+Figur 3.3 er oversikten over costumer count på STORE 50 og 51. Det figuren sier oss er at STORE 51 er markant mer besøkt enn 50, dette med tre/fire ganger så mye trafikk.
+
+## Oppgave 4
+
+**Kan dataene benyttes til å planlegge nye utsalg? Dersom konsernledelsen ønsker å etablere et nytt utsalg, hvordan kan de benytte dataene til å finne den beste lokasjonen?**
+
+```{r}
+# Regner custcoun basert på store. 
+df_store <- aggregate(custcoun ~ custcoun + STORE, data = df, FUN = sum)
+
+# Geom_bar(). 
+fig4.1 <- ggplot(df_store, aes(x=STORE, y=custcoun, fill = STORE)) + 
+  geom_bar(stat = "identity") +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = "Store",
+       y = "Costumer value",
+       title = "Fig 4.1: Costumer count in Chicago",
+       caption = "Credit: Chicago Booth - Dominick`s Dataset") +
+  theme_bw()
+
+fig4.1
+```
+
+Figur 4.1 viser fordelingen på på costumer count blant Store 50 til 100. Skulle man åpnet et nytt utsalgsted ville jeg anbefalt å åpne i områder der markedet er godt etablert, kanskje ikke det det er mest kunder siden det er vanskelig å konkurrere mot de, men åpne en butikk i nærheten av STORE 70 feks.
+
+## Kilder
+
+[Dominick\`s Data Manual](https://www.chicagobooth.edu/-/media/enterprise/centers/kilts/datasets/dominicks-dataset/dominicks-manual-and-codebook_kiltscenter)
+
+[Dominick\`s Dataset](https://www.chicagobooth.edu/research/kilts/datasets/dominicks)

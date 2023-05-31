@@ -1,0 +1,164 @@
+---
+title: "14_SOK1005_PO_V23"
+author: "14"
+format: html
+editor: visual
+---
+
+## Prosjektoppgave
+
+```{r}
+category <- c("Analgesics","Bath Soap","Beer","Bottled Juices","Cereals",
+              "Cheeses","Cigarettes","Cookies","Crackers","Canned Soup",
+              "Dish Detergent","Front-end-candies","Frozen Dinners","Frozen Entrees",
+              "Frozen Juices","Fabric Softeners","Grooming Products","Laundry Detergents",
+              "Oatmeal","Paper Towels","Soft Drinks","Shampoos","Snack Crackers",
+              "Soaps","Toothbrushes","Canned Tuna","Toothpastes","Bathroom Tissues")
+
+letter2number <- function(x) {utf8ToInt(x) - utf8ToInt("A") + 1L}
+seed_number <- sum(letter2number("Tobias"))
+set.seed(seed_number)
+sample(category, 1)
+```
+
+## Pre-work
+
+### Data Acquisistion
+
+```{r}
+rm(list = ls())
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(utils))
+suppressPackageStartupMessages(library(foreign))
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library("plyr"))
+suppressPackageStartupMessages(library(lubridate))
+```
+
+```{r}
+# Customer count file. 
+COSTCOUNT <- read.dta("ccount.dta") 
+
+# Store-specific demographic data. 
+DEMO <- read.dta("demo.dta")
+
+# UPC file "Bathroom Tissues. 
+UPC <- read.csv("upctti.csv")
+
+# Movement data "Bathroom Tissues". 
+MOV <- read.csv("wtti.csv")
+```
+
+### Data Wrangling
+
+```{r}
+# Identify brands. 
+brands <- paste(c("CHARMIN", "ANGEL", "CORONET", "KLEENEX", "QUILTED"), collapse = "|")
+
+UPC <- UPC %>% 
+  filter(grepl(brands, DESCRIP)) %>%
+  mutate(brand = str_extract(DESCRIP, brands))
+```
+
+```{r}
+# Merge UPC and MOV by "UPC". 
+UPC_MOV <- merge(UPC, MOV, by="UPC")
+
+# Filter between week 16 and 68, "part 8: Weeks`s Decode Table". 
+UPC_MOV <- UPC_MOV %>%
+  filter(between(WEEK, 16, 68))
+
+# Remove "OK" = 0, flagged data. "Remarks 5". 
+UPC_MOV <- UPC_MOV %>%
+  filter(OK == 1)
+
+# MOVE over 0. 
+UPC_MOV <- UPC_MOV %>%
+  filter(MOVE > 0)
+
+# Calculating sasles, grouped by STORE, WEEK, UPC and brand.
+# Formula from page 10, remarks 2. (Sales = Price * Move / Qty). 
+UPC_MOV <- UPC_MOV %>%
+  group_by(STORE, WEEK, UPC, brand) %>%
+  mutate(sales = PRICE*MOVE/QTY)
+
+# Keeping the columns i need. 
+UPC_MOV <- UPC_MOV %>%
+  select(c(1, 7, 8, 9, 11, 14, 18))
+
+# filter sales over 200. 
+UPC_MOV <- UPC_MOV %>%
+  filter(sales >= 200)
+
+# Filtering between store 2 and 100. 
+# This to make the csv file later smaller.  
+UPC_MOV <- UPC_MOV %>%
+  filter(STORE >= 2, STORE <= 100)
+```
+
+```{r}
+# selecting columns i need, acording to page 7 in the manual
+DEMO <- DEMO %>%
+  select(c('city', 'store', 'age9', 'age60', 'ethnic', 'educ', 'nocar', 'income', 
+           'incsigma', 'hsizeavg', 'hsize1', 'hsize2', 'hsize34', 
+           'hsize567', 'hh3plus', 'hh4plus', 'hhsingle', 'hhlarge', 
+           'workwom', 'sinhouse', 'density', 'hval150', 'hval200', 
+           'hvalmean', 'single', 'retired', 'unemp', 'wrkch5', 'wrkch17', 
+           'nwrkch5', 'nwrkch17', 'wrkch', 'nwrkch', 'wrkwch', 'wrkwnch', 
+           'telephn', 'mortgage', 'nwhite', 'poverty', 'shpcons', 'shphurr', 
+           'shpavid', 'shpkstr', 'shpunft', 'shpbird', 'shopindx', 'shopindx'))
+
+# Drop na. 
+DEMO <- DEMO %>%
+  na.omit()
+
+```
+
+```{r}
+# Filter week, just like above. 
+COSTCOUNT <- COSTCOUNT %>%
+  filter(between(week, 16, 68))
+
+# Making date. 
+COSTCOUNT$date <- ymd(COSTCOUNT$date)
+
+# Remove na. 
+COSTCOUNT <- COSTCOUNT %>%
+  na.omit()
+
+COSTCOUNT <- COSTCOUNT %>%
+  select(c('custcoun', 'grocery', 'groccoup', 'store', 'week', 'date'))
+
+# Changing name. 
+COSTCOUNT <- COSTCOUNT %>%
+  dplyr::rename("WEEK" = "week") %>%
+  dplyr::rename("STORE" = "store")
+
+# Filter with the same stores in UPC_MOV. 
+COSTCOUNT <- COSTCOUNT %>%
+  filter(STORE >= 2, STORE <= 100)
+
+# Merge by store and week. 
+UPC_MOV_CC <- merge(UPC_MOV, COSTCOUNT, by = c("WEEK", "STORE"), all = TRUE)
+
+# drop na. 
+UPC_MOV_CC <- UPC_MOV_CC %>%
+  na.omit()
+
+# Rename for merge. 
+DEMO <- DEMO %>%
+  dplyr::rename("STORE" = "store")
+
+# Filter with the same stores in UPC_MOV_CC. 
+DEMO <- DEMO %>%
+  filter(STORE >= 2, STORE <= 100)
+
+
+# Merge by STORE.  
+df <- merge(UPC_MOV_CC, DEMO, by = c("STORE"), all = TRUE)
+
+df <- df %>%
+  select(-c('grocery', 'groccoup'))
+
+write.csv(df, file = "df.csv", row.names = FALSE, na = '')
+```
